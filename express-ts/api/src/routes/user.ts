@@ -32,45 +32,100 @@ router.get("/", authenticateToken, (req: CustomRequest, res: Response) => {
 });
 
 router.post("/", async (req: CustomRequest, res: Response) => {
-  var hashedPassword = await bcrypt.hash(req.body.password, 10);
-  db.query(
-    "INSERT INTO user ( username, email, password) VALUES (?, ?, ?)",
-    [req.body.username, req.body.email, hashedPassword],
-    (err: any, result: any) => {
-      if (err) {
-        console.error(err);
-        res.status(500).json(err.code);
-        return;
-      }
-      let safeUser = { ...req.body, password: null, id: result.insertId };
-      const accessToken = jwt.sign(safeUser, process.env.JWT_TOKEN);
-      res.cookie("jwt", accessToken).end();
+  if (!req.body.password) {
+    return res.status(422).json("No password");
+  }
+  let hashedPassword: string = await bcrypt.hash(req.body.password, 10);
+  let picture: string | null = req.body.picture || null;
+
+  if (picture === null) {
+    switch (req.body.gender) {
+      case "male":
+        picture = process.env.API_PUBLIC_URL + "/upload/default-male.svg";
+        break;
+      case "female":
+        picture = process.env.API_PUBLIC_URL + "/upload/default-female.svg";
+        break;
+      default:
+        break;
     }
-  );
+  }
+
+  let user: User = {
+    username: req.body.username,
+    email: req.body.email,
+    password: hashedPassword,
+    gender: req.body.gender || null,
+    picture: picture,
+  };
+
+  if (user.username && user.email && user.password) {
+    db.query(
+      "INSERT INTO user ( username, email, password, gender, picture) VALUES (?, ?, ?, ?, ?)",
+      [user.username, user.email, user.password, user.gender, user.picture],
+      (err: any, result: any) => {
+        if (err) {
+          console.error(err);
+          res.status(500).json(err.code);
+          return;
+        }
+        let safeUser = { ...req.body, password: null, id: result.insertId };
+        const accessToken = jwt.sign(safeUser, process.env.JWT_TOKEN);
+        res.cookie("jwt", accessToken).end();
+      }
+    );
+  } else {
+    res.status(422).json("Not enaugh details");
+  }
 });
 
 router.patch(
   "/",
   authenticateToken,
   async (req: CustomRequest, res: Response) => {
-    if (req.body.password !== null && req.body.password !== "") {
-      var hashedPassword = await bcrypt.hash(req.body.password, 10);
+    let hashedPassword: string = "";
+    if (req.body.password) {
+      hashedPassword = await bcrypt.hash(req.body.password, 10);
     }
 
+    let picture: string | null = null;
+    switch (req.body.gender) {
+      case "male":
+        picture = process.env.API_PUBLIC_URL + "/upload/default-male.svg";
+        break;
+      case "female":
+        picture = process.env.API_PUBLIC_URL + "/upload/default-female.svg";
+        break;
+      default:
+        break;
+    }
+
+    let user: User = {
+      id: req.user.id,
+      username: req.body.username || null,
+      email: req.body.email || null,
+      password: hashedPassword,
+      gender: req.body.gender || null,
+      picture: req.body.picture || picture,
+    };
+
     db.query(
-      `UPDATE user SET username = ?, email = ?, picture = ?${
-        hashedPassword !== undefined
-          ? ", password = " + db.escape(hashedPassword)
-          : ""
-      } WHERE id = ?`,
-      [req.body.username, req.body.email, req.body.picture, req.user.id],
+      `UPDATE user SET username = COALESCE(NULLIF(?, ''), username), email = COALESCE(NULLIF(?, ''), email), picture = COALESCE(picture, ?), gender = COALESCE(NULLIF(?, ''), gender), password = COALESCE(NULLIF(?, ''), password) WHERE id = ?`,
+      [
+        user.username,
+        user.email,
+        user.picture,
+        user.gender,
+        user.password,
+        user.id,
+      ],
       (err: any) => {
         if (err) {
           console.error(err);
           res.status(500).json(err.code);
           return;
         }
-        let safeUser = { ...req.body, password: null, id: req.user.id };
+        let safeUser: User = { ...req.body, password: null, id: req.user.id };
         const accessToken = jwt.sign(safeUser, process.env.JWT_TOKEN);
         res.cookie("jwt", accessToken).end();
       }

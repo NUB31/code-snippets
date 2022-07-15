@@ -31,7 +31,7 @@ app.use(
 
 // Define public folder as folder for public files :)
 app.use(express.static("public"));
-app.use("upload", express.static("upload"));
+app.use("/upload", express.static("upload"));
 
 // Get access to jwt cookie
 // For parsing different types of requests, and set limit high to prevent error
