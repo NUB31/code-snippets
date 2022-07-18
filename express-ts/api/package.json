@@ -16,9 +16,11 @@
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.3",
-    "@types/jsonwebtoken": "^8.5.8",
     "@types/bcrypt": "^5.0.0",
+    "@types/cookie-parser": "^1.4.3",
+    "@types/cors": "^2.8.12",
     "@types/express": "^4.17.13",
+    "@types/jsonwebtoken": "^8.5.8",
     "@types/multer": "^1.4.7",
     "@types/node": "^18.0.4",
     "nodemon": "^2.0.18",
@@ -31,5 +33,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "type": "module"
 }

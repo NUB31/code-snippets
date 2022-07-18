@@ -1,22 +1,26 @@
 //imports
-var mysql = require("mysql2");
-require("dotenv").config();
-
+import mysql from "mysql2/promise";
+import dotenv from "dotenv";
+dotenv.config();
 //mysql config
-var pool = mysql.createPool({
+
+let port = 3306;
+
+if (process.env.MYSQL_PORT) {
+  port = parseInt(process.env.MYSQL_PORT);
+}
+
+let pool = await mysql.createPool({
   host: process.env.MYSQL_HOST || "localhost",
-  port: process.env.MYSQL_PORT || 3306,
+  port: port,
   user: process.env.MYSQL_USER || "root",
   password: process.env.MYSQL_PASSWORD || "",
   database: process.env.MYSQL_DATABASE || "devDatabase",
 });
 
 //gets connection
-pool.getConnection((err: any, connection: any) => {
-  if (err) throw err;
-  console.log("Database connected successfully");
-  connection.release();
-});
+let con = await pool.getConnection();
+console.log("Database connected successfully");
+con.release();
 
-//export connection to use in index.js
-module.exports = pool;
+export default pool;

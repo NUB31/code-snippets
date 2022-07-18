@@ -1,39 +1,49 @@
 import { Response } from "express";
 import { CustomRequest } from "../types/CustomRequest";
 import { User } from "../types/User";
-const router = require("express").Router();
-var db = require("../utility/connection");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import express from "express";
+const router = express.Router();
+import db from "../utility/connection.js";
 
 // Middleware that checks if user is logged inn
-const { authenticateToken } = require("../middleware/authenticateUser");
+import authenticateToken from "../middleware/authenticateUser.js";
+import { QueryError } from "mysql2";
 
 // user routes
-router.get("/", authenticateToken, (req: CustomRequest, res: Response) => {
-  db.query(
-    "SELECT * FROM user WHERE id = ? LIMIT 1",
-    [req.user.id],
-    (err: any, rows: User[]) => {
-      if (err) {
-        console.error(err);
-        res.status(500).json(err.code);
-        return;
-      }
+router.get(
+  "/",
+  authenticateToken,
+  async (req: CustomRequest, res: Response) => {
+    if (!req.user) {
+      res.status(401).json("You are not signed in");
+      return;
+    }
+    try {
+      let [data] = await db.query("SELECT * FROM user WHERE id = ? LIMIT 1", [
+        req.user.id,
+      ]);
+
+      let rows = JSON.parse(JSON.stringify(data));
       if (rows.length === 0) {
-        res.status(403).json("No user found with your id");
+        res.status(401).json("No user found with your id");
         return;
       }
       const user = rows[0];
       const safeUser = { ...user, password: null };
       res.json(safeUser);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json("Something went wrong");
     }
-  );
-});
+  }
+);
 
 router.post("/", async (req: CustomRequest, res: Response) => {
   if (!req.body.password) {
-    return res.status(422).json("No password");
+    res.status(422).json("No password");
+    return;
   }
   let hashedPassword: string = await bcrypt.hash(req.body.password, 10);
   let picture: string | null = req.body.picture || null;
@@ -59,23 +69,25 @@ router.post("/", async (req: CustomRequest, res: Response) => {
     picture: picture,
   };
 
-  if (user.username && user.email && user.password) {
-    db.query(
-      "INSERT INTO user ( username, email, password, gender, picture) VALUES (?, ?, ?, ?, ?)",
-      [user.username, user.email, user.password, user.gender, user.picture],
-      (err: any, result: any) => {
-        if (err) {
-          console.error(err);
-          res.status(500).json(err.code);
-          return;
-        }
-        let safeUser = { ...req.body, password: null, id: result.insertId };
-        const accessToken = jwt.sign(safeUser, process.env.JWT_TOKEN);
-        res.cookie("jwt", accessToken).end();
-      }
-    );
-  } else {
-    res.status(422).json("Not enaugh details");
+  try {
+    if (user.username && user.email && user.password) {
+      let [data] = await db.query(
+        "INSERT INTO user ( username, email, password, gender, picture) VALUES (?, ?, ?, ?, ?)",
+        [user.username, user.email, user.password, user.gender, user.picture]
+      );
+      let result = JSON.parse(JSON.stringify(data));
+      let safeUser = { ...req.body, password: null, id: result.insertId };
+      const accessToken = jwt.sign(
+        safeUser,
+        process.env.JWT_TOKEN || "changeMe"
+      );
+      res.cookie("jwt", accessToken).end();
+    } else {
+      res.status(422).json("Not enaugh details");
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json("Something went wrong");
   }
 });
 
@@ -83,6 +95,10 @@ router.patch(
   "/",
   authenticateToken,
   async (req: CustomRequest, res: Response) => {
+    if (!req.user) {
+      res.status(401).json("You are not signed in");
+      return;
+    }
     let hashedPassword: string = "";
     if (req.body.password) {
       hashedPassword = await bcrypt.hash(req.body.password, 10);
@@ -108,29 +124,33 @@ router.patch(
       gender: req.body.gender || null,
       picture: req.body.picture || picture,
     };
-
-    db.query(
-      `UPDATE user SET username = COALESCE(NULLIF(?, ''), username), email = COALESCE(NULLIF(?, ''), email), picture = COALESCE(picture, ?), gender = COALESCE(NULLIF(?, ''), gender), password = COALESCE(NULLIF(?, ''), password) WHERE id = ?`,
-      [
-        user.username,
-        user.email,
-        user.picture,
-        user.gender,
-        user.password,
-        user.id,
-      ],
-      (err: any) => {
-        if (err) {
-          console.error(err);
-          res.status(500).json(err.code);
-          return;
-        }
+    try {
+      await db.query(
+        `UPDATE user SET username = COALESCE(NULLIF(?, ''), username), email = COALESCE(NULLIF(?, ''), email), picture = COALESCE(picture, ?), gender = COALESCE(NULLIF(?, ''), gender), password = COALESCE(NULLIF(?, ''), password) WHERE id = ?`,
+        [
+          user.username,
+          user.email,
+          user.picture,
+          user.gender,
+          user.password,
+          user.id,
+        ]
+      );
+      if (req.user) {
         let safeUser: User = { ...req.body, password: null, id: req.user.id };
-        const accessToken = jwt.sign(safeUser, process.env.JWT_TOKEN);
+        const accessToken = jwt.sign(
+          safeUser,
+          process.env.JWT_TOKEN || "changeMe"
+        );
         res.cookie("jwt", accessToken).end();
+      } else {
+        res.status(500).json("Something went wrong");
       }
-    );
+    } catch (err) {
+      console.error(err);
+      res.status(500).json("Something went wrong");
+    }
   }
 );
 
-module.exports = router;
+export default router;

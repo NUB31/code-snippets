@@ -1,12 +1,10 @@
 import { NextFunction, Response } from "express";
-import { JsonWebTokenError } from "jsonwebtoken";
-import { CustomRequest } from "../types/CustomRequest";
-import { User } from "../types/User";
-
-const jwt = require("jsonwebtoken");
+import { CustomRequest } from "../types/CustomRequest.js";
+import jwt, { JsonWebTokenError, VerifyErrors } from "jsonwebtoken";
+import { User } from "../types/User.js";
 
 // checks ig jwt token is real and grants access to user
-export const authenticateToken = (
+const authenticateToken = (
   req: CustomRequest,
   res: Response,
   next: NextFunction
@@ -18,14 +16,16 @@ export const authenticateToken = (
   // else check if token is valid
   jwt.verify(
     token,
-    process.env.JWT_TOKEN,
-    (err: JsonWebTokenError, user: User) => {
-      // if token is not valid, return to login
+    process.env.JWT_TOKEN || "changeMe",
+    (err: any, decoded: any) => {
+      // if token is not valid
       if (err) return res.status(401).json("You are not signed in");
-      // set the username as req.user
-      req.user = user;
+      // Set req.user as the user object extracted from the token
+      req.user = decoded;
       // continue request
       next();
     }
   );
 };
+
+export default authenticateToken;

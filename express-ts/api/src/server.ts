@@ -1,17 +1,18 @@
 // imports
-require("dotenv").config();
 import { Response } from "express";
 import { CustomRequest } from "./types/CustomRequest";
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const cors = require("cors");
-const multer = require("multer");
-const { authenticateToken } = require("./middleware/authenticateUser");
-const fs = require("fs");
+import express from "express";
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import multer from "multer";
+import authenticateToken from "./middleware/authenticateUser.js";
+import fs from "fs";
+import dotenv from "dotenv";
+dotenv.config();
 
 // Include routes
-const authRoute = require("./routes/auth");
-const userRoute = require("./routes/user");
+import authRoute from "./routes/auth.js";
+import userRoute from "./routes/user.js";
 
 // Define app port
 const port = process.env.PORT || 3002;
@@ -25,7 +26,7 @@ const app = express();
 app.use(
   cors({
     credentials: true,
-    origin: [process.env.CLIENT_PUBLIC_URL],
+    origin: process.env.CLIENT_PUBLIC_URL,
   })
 );
 
