@@ -1,10 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 
-require("dotenv").config();
-let schedule = require("node-schedule");
-const nodemailer = require("nodemailer");
-let uniqueVisitors: string[] = [];
+import schedule from "node-schedule";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
 
+let uniqueVisitors: string[] = [];
 let transporter = nodemailer.createTransport({
   service: "hotmail",
   auth: {
